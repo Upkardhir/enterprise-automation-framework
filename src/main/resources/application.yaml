@@ -1,0 +1,80 @@
+# Application Configuration for Enterprise Automation Framework
+# This file contains all the settings for your framework
+
+# Spring Boot Configuration
+spring:
+  application:
+    name: enterprise-automation-framework
+  
+  # Profile Configuration (we'll use this for different environments)
+  profiles:
+    active: local  # Options: local, dev, staging, prod
+
+# Framework Configuration
+automation:
+  # Web Testing Configuration
+  web:
+    browser: chrome           # Options: chrome, firefox, edge, safari
+    headless: false          # true for CI/CD, false for local development
+    timeout: 30              # Default wait timeout in seconds
+    window-size: "1920x1080" # Browser window size
+    
+  # API Testing Configuration  
+  api:
+    base-url: "https://jsonplaceholder.typicode.com"
+    timeout: 15
+    retry-count: 3
+    
+  # Database Configuration
+  database:
+    url: "jdbc:mysql://localhost:3306/testdb"
+    username: "testuser"
+    password: "testpass"
+    driver: "com.mysql.cj.jdbc.Driver"
+    
+  # Mobile Testing Configuration
+  mobile:
+    platform: android        # Options: android, ios
+    device-name: "Pixel_6"
+    app-path: "/path/to/app.apk"
+    
+  # Reporting Configuration
+  reporting:
+    allure-results: "target/allure-results"
+    screenshots: true
+    video-recording: false
+
+# Logging Configuration
+logging:
+  level:
+    com.enterprise.automation: INFO
+    org.springframework: WARN
+    org.selenium: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+---
+# Local Environment Profile
+spring:
+  config:
+    activate:
+      on-profile: local
+automation:
+  web:
+    headless: false
+  database:
+    url: "jdbc:mysql://localhost:3306/testdb_local"
+
+---
+# CI/CD Environment Profile  
+spring:
+  config:
+    activate:
+      on-profile: ci
+automation:
+  web:
+    headless: true
+    browser: chrome
+  reporting:
+    screenshots: true
+    video-recording: true
