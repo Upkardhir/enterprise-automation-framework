@@ -18,11 +18,20 @@ public abstract class BaseTest extends AbstractTestNGSpringContextTests {
 
     @BeforeMethod
     public void setUp() {
-        driver = webDriverManager.initializeDriver();
+        try {
+            driver = webDriverManager.initializeDriver();
+        } catch (Exception e) {
+            e.printStackTrace();  // print full details in console
+            throw new RuntimeException("WebDriver initialization failed: " + e.getMessage(), e);
+        }
     }
 
     @AfterMethod
     public void tearDown() {
-        WebDriverManager.quitDriver();
+        try {
+            WebDriverManager.quitDriver();
+        } catch (Exception e) {
+            System.err.println("Error during WebDriver teardown: " + e.getMessage());
+        }
     }
 }

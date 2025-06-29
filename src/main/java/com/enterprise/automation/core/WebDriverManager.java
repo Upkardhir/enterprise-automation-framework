@@ -1,5 +1,6 @@
 package com.enterprise.automation.core;
 
+import com.enterprise.automation.config.ChromeConfig;
 import com.enterprise.automation.config.FrameworkConfig;
 
 import org.openqa.selenium.PageLoadStrategy;
@@ -36,6 +37,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -256,79 +258,82 @@ public class WebDriverManager {
      * Get Chrome options from Spring Boot configuration
      * This enhanced version reads all 'args' from the YAML capabilities map.
      */
-    private ChromeOptions getChromeOptionsFromConfig(boolean headless) {
-        ChromeOptions options = new ChromeOptions();
-        FrameworkConfig.Web webConfig = frameworkConfig.getWeb();
-
-        // Apply headless mode
-        if (headless) {
-            options.addArguments("--headless=new");
-        }
-
-        // Get Chrome-specific capabilities from YAML
-        Map<String, Object> chromeConfig = webConfig.getBrowserCapabilities("chrome");
-        if (chromeConfig != null) {
-            // Handle Chrome arguments
-            if (chromeConfig.containsKey("args")) {
-                @SuppressWarnings("unchecked")
-                List<String> args = (List<String>) chromeConfig.get("args");
-                if (args != null && !args.isEmpty()) {
-                    options.addArguments(args);
-                    logger.debug("Added Chrome arguments: {}", args);
-                }
-            }
-            
-            // Handle Chrome preferences
-            if (chromeConfig.containsKey("prefs")) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> prefs = (Map<String, Object>) chromeConfig.get("prefs");
-                if (prefs != null && !prefs.isEmpty()) {
-                    options.setExperimentalOption("prefs", prefs);
-                    logger.debug("Added Chrome preferences: {}", prefs);
-                }
-            }
-            
-            // Handle experimental options
-            if (chromeConfig.containsKey("experimentalOptions")) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> expOptions = (Map<String, Object>) chromeConfig.get("experimentalOptions");
-                expOptions.forEach(options::setExperimentalOption);
-            }
-        }
-
-        // Apply global capabilities
-        Map<String, Object> capabilities = webConfig.getCapabilities();
-        if (capabilities != null) {
-            if (capabilities.containsKey("acceptInsecureCerts")) {
-                options.setAcceptInsecureCerts((Boolean) capabilities.get("acceptInsecureCerts"));
-            }
-            
-            if (capabilities.containsKey("pageLoadStrategy")) {
-                options.setPageLoadStrategy(PageLoadStrategy.fromString((String) capabilities.get("pageLoadStrategy")));
-            }
-            
-            if (capabilities.containsKey("unhandledPromptBehavior")) {
-                options.setUnhandledPromptBehaviour(UnexpectedAlertBehaviour.fromString((String) capabilities.get("unhandledPromptBehavior")));
-            }
-        }
-
-        // Default download preferences if not specified in config
-        if (chromeConfig == null || !chromeConfig.containsKey("prefs")) {
-            Map<String, Object> defaultPrefs = new HashMap<>();
-            defaultPrefs.put("download.default_directory", System.getProperty("user.dir") + "/downloads");
-            defaultPrefs.put("download.prompt_for_download", false);
-            defaultPrefs.put("download.directory_upgrade", true);
-            defaultPrefs.put("safeBrowse.enabled", true);
-            options.setExperimentalOption("prefs", defaultPrefs);
-        }
-
-        logger.debug("Chrome options configured successfully");
-        return options;
-    }
-
+	/*
+	 * private ChromeOptions getChromeOptionsFromConfig(boolean headless) {
+	 * ChromeOptions options = new ChromeOptions(); FrameworkConfig.Web webConfig =
+	 * frameworkConfig.getWeb();
+	 * 
+	 * // Apply headless mode if (headless) {
+	 * options.addArguments("--headless=new"); }
+	 * 
+	 * // Get Chrome-specific capabilities from YAML Map<String, Object>
+	 * chromeConfig = webConfig.getBrowserCapabilities("chrome"); if (chromeConfig
+	 * != null) { // Handle Chrome arguments if (chromeConfig.containsKey("args")) {
+	 * 
+	 * @SuppressWarnings("unchecked") List<String> args = (List<String>)
+	 * chromeConfig.get("args"); if (args != null && !args.isEmpty()) {
+	 * options.addArguments(args); logger.debug("Added Chrome arguments: {}", args);
+	 * } }
+	 * 
+	 * // Handle Chrome preferences if (chromeConfig.containsKey("prefs")) {
+	 * 
+	 * @SuppressWarnings("unchecked") Map<String, Object> prefs = (Map<String,
+	 * Object>) chromeConfig.get("prefs"); if (prefs != null && !prefs.isEmpty()) {
+	 * options.setExperimentalOption("prefs", prefs);
+	 * logger.debug("Added Chrome preferences: {}", prefs); } }
+	 * 
+	 * // Handle experimental options if
+	 * (chromeConfig.containsKey("experimentalOptions")) {
+	 * 
+	 * @SuppressWarnings("unchecked") Map<String, Object> expOptions = (Map<String,
+	 * Object>) chromeConfig.get("experimentalOptions");
+	 * expOptions.forEach(options::setExperimentalOption); } }
+	 * 
+	 * // Apply global capabilities Map<String, Object> capabilities =
+	 * webConfig.getCapabilities(); if (capabilities != null) { if
+	 * (capabilities.containsKey("acceptInsecureCerts")) {
+	 * options.setAcceptInsecureCerts((Boolean)
+	 * capabilities.get("acceptInsecureCerts")); }
+	 * 
+	 * if (capabilities.containsKey("pageLoadStrategy")) {
+	 * options.setPageLoadStrategy(PageLoadStrategy.fromString((String)
+	 * capabilities.get("pageLoadStrategy"))); }
+	 * 
+	 * if (capabilities.containsKey("unhandledPromptBehavior")) {
+	 * options.setUnhandledPromptBehaviour(UnexpectedAlertBehaviour.fromString((
+	 * String) capabilities.get("unhandledPromptBehavior"))); } }
+	 * 
+	 * // Default download preferences if not specified in config if (chromeConfig
+	 * == null || !chromeConfig.containsKey("prefs")) { Map<String, Object>
+	 * defaultPrefs = new HashMap<>();
+	 * defaultPrefs.put("download.default_directory", System.getProperty("user.dir")
+	 * + "/downloads"); defaultPrefs.put("download.prompt_for_download", false);
+	 * defaultPrefs.put("download.directory_upgrade", true);
+	 * defaultPrefs.put("safeBrowse.enabled", true);
+	 * options.setExperimentalOption("prefs", defaultPrefs); }
+	 * 
+	 * logger.debug("Chrome options configured successfully"); return options; }
+	 */
     /**
      * Get Firefox options from Spring Boot configuration
      */
+    @Autowired
+    private ChromeConfig chromeConfig;
+    private ChromeOptions getChromeOptionsFromConfig(boolean headlessOverride) {
+        ChromeOptions options = new ChromeOptions();
+        List<String> args = new ArrayList<>(chromeConfig.getArgs());
+
+        // Inject headless flag from override if it's not already in YAML
+        if (headlessOverride && args.stream().noneMatch(arg -> arg.contains("headless"))) {
+            args.add("--headless=new");
+        }
+
+        options.addArguments(args);
+        options.setExperimentalOption("prefs", chromeConfig.getPrefs());
+        return options;
+    }
+
+
     private FirefoxOptions getFirefoxOptionsFromConfig(boolean headless) {
         FirefoxOptions options = new FirefoxOptions();
         FrameworkConfig.Web webConfig = frameworkConfig.getWeb();
