@@ -8,7 +8,7 @@ spring:
   
   # Profile Configuration (we'll use this for different environments)
   profiles:
-    active: local  # Options: local, dev, staging, prod
+    active: local  # Options: local, ci, dev, staging, prod
 
 # Framework Configuration
 automation:
@@ -17,30 +17,40 @@ automation:
     browser: chrome           # Options: chrome, firefox, edge, safari
     headless: false          # true for CI/CD, false for local development
     timeout: 30              # Default wait timeout in seconds
-    window-size: "1920x1080" # Browser window size
-	# New: Add browser capabilities for advanced settings
+    window-size: "1920,1080"  # Browser window size (e.g., "1920,1080" for 1920x1080)
+    # New: Add browser capabilities for advanced settings
     capabilities:
       acceptInsecureCerts: true
       # Example for Chrome
       chrome:
-        args: ["--disable-gpu", "--no-sandbox"]
-	  # Firefox Options
+        # New: Centralized all Chrome arguments here
+        args:
+          - "--disable-gpu"
+          - "--no-sandbox"
+          - "--disable-dev-shm-usage"
+          - "--disable-extensions"
+          - "--start-maximized"
+      # Firefox Options
       moz:firefoxOptions:
         args: ["-headless"] # Note: Firefox uses a single hyphen for headless mode.
       # Microsoft Edge Options (similar to Chrome)
       ms:edgeOptions:
-        args: ["--disable-gpu", "--no-sandbox"]
-		
+        args:
+          - "--disable-gpu"
+          - "--no-sandbox"
+          - "--disable-dev-shm-usage"
+          - "--start-maximized"
+
   # API Testing Configuration  
   api:
     base-url: "https://jsonplaceholder.typicode.com"
     timeout: 15
     retry-count: 3
-	# New: Add default headers for all API requests
+    # New: Add default headers for all API requests
     headers:
-     Content-Type: "application/json"
-     Accept: "application/json"
-	 
+      Content-Type: "application/json"
+      Accept: "application/json"
+    
   # Database Configuration
   database:
     url: "jdbc:mysql://localhost:3306/testdb"
@@ -64,8 +74,8 @@ automation:
 logging:
   level:
     com.enterprise.automation: INFO
-	# New: Set specific logging for REST Assured or other clients
-	io.restassured: DEBUG
+    # New: Set specific logging for REST Assured or other clients
+    io.restassured: DEBUG
     org.springframework: WARN
     org.selenium: WARN
   pattern:
