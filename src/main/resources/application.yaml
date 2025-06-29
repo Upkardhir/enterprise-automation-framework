@@ -18,18 +18,34 @@ automation:
     headless: false          # true for CI/CD, false for local development
     timeout: 30              # Default wait timeout in seconds
     window-size: "1920x1080" # Browser window size
-    
+	# New: Add browser capabilities for advanced settings
+    capabilities:
+      acceptInsecureCerts: true
+      # Example for Chrome
+      chrome:
+        args: ["--disable-gpu", "--no-sandbox"]
+	  # Firefox Options
+      moz:firefoxOptions:
+        args: ["-headless"] # Note: Firefox uses a single hyphen for headless mode.
+      # Microsoft Edge Options (similar to Chrome)
+      ms:edgeOptions:
+        args: ["--disable-gpu", "--no-sandbox"]
+		
   # API Testing Configuration  
   api:
     base-url: "https://jsonplaceholder.typicode.com"
     timeout: 15
     retry-count: 3
-    
+	# New: Add default headers for all API requests
+    headers:
+     Content-Type: "application/json"
+     Accept: "application/json"
+	 
   # Database Configuration
   database:
     url: "jdbc:mysql://localhost:3306/testdb"
-    username: "testuser"
-    password: "testpass"
+    username: "${DB_USERNAME}"
+    password: "${DB_PASSWORD}"
     driver: "com.mysql.cj.jdbc.Driver"
     
   # Mobile Testing Configuration
@@ -48,10 +64,12 @@ automation:
 logging:
   level:
     com.enterprise.automation: INFO
+	# New: Set specific logging for REST Assured or other clients
+	io.restassured: DEBUG
     org.springframework: WARN
     org.selenium: WARN
   pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
 
 ---
 # Local Environment Profile

@@ -20,12 +20,11 @@
     </parent>
 
     <properties>
-        <java.version>21</java.version>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        
         <!-- Version properties -->
+        <java.version>21</java.version>
         <selenium.version>4.26.0</selenium.version>
         <testng.version>7.8.0</testng.version>
         <webdrivermanager.version>5.6.2</webdrivermanager.version>
@@ -41,6 +40,10 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
         
         <!-- Spring Boot Test - Testing support with Spring -->
