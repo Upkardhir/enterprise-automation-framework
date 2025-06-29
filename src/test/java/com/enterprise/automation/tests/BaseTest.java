@@ -2,27 +2,27 @@ package com.enterprise.automation.tests;
 
 import com.enterprise.automation.core.WebDriverManager;
 import org.openqa.selenium.WebDriver;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.testng.AbstractTestNGSpringContextTests;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.AfterMethod;
 
 @SpringBootTest
-public abstract class BaseTest {
+public abstract class BaseTest extends AbstractTestNGSpringContextTests {
 
     @Autowired
     protected WebDriverManager webDriverManager;
 
     protected WebDriver driver;
 
-    @BeforeEach
+    @BeforeMethod
     public void setUp() {
         driver = webDriverManager.initializeDriver();
     }
 
-    @AfterEach
+    @AfterMethod
     public void tearDown() {
-        WebDriverManager.quitDriver();  // or webDriverManager.quitDriver()
+        WebDriverManager.quitDriver();
     }
 }
-

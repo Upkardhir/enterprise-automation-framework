@@ -22,7 +22,6 @@ import java.util.Map;
  * @version 3.0
  */
 @Data
-@Component
 @Validated
 @ConfigurationProperties(prefix = "automation")
 public class FrameworkConfig {

@@ -2,8 +2,8 @@
 spring:
   application:
     name: enterprise-automation-framework
-  profiles:
-    active: local
+  #profiles:
+    #active: local
 
 # Main Framework Configuration
 automation:
