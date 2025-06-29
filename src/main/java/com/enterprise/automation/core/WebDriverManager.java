@@ -1,6 +1,9 @@
 package com.enterprise.automation.core;
 
 import com.enterprise.automation.config.FrameworkConfig;
+
+import org.openqa.selenium.PageLoadStrategy;
+import org.openqa.selenium.UnexpectedAlertBehaviour;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
@@ -23,7 +26,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.context.annotation.Scope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import org.openqa.selenium.Dimension;
+import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.PageLoadStrategy;
+import org.openqa.selenium.UnexpectedAlertBehaviour;
+import org.openqa.selenium.remote.AbstractDriverOptions;
+import org.openqa.selenium.remote.LocalFileDetector;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
@@ -192,40 +200,40 @@ public class WebDriverManager {
     }
     
     /**
-     * Create remote WebDriver instance
+     * Modern approach for creating remote WebDriver (Selenium 4+)
      */
     private WebDriver createRemoteDriver(String browserType, boolean headless, String hubUrl) {
         try {
-            // DesiredCapabilities is now initialized from the Options object
-            DesiredCapabilities capabilities = new DesiredCapabilities();
+            AbstractDriverOptions<?> options;
             
-            switch (browserType) {
+            switch (browserType.toLowerCase()) {
                 case "chrome":
-                    // Correct syntax for Selenium 4.x+
-                    ChromeOptions chromeOptions = getChromeOptionsFromConfig(headless);
-                    capabilities.setCapability(ChromeOptions.CAPABILITY, chromeOptions);
+                    options = getChromeOptionsFromConfig(headless);
                     break;
                 case "firefox":
-                    // Correct syntax for Selenium 4.x+
-                    FirefoxOptions firefoxOptions = getFirefoxOptionsFromConfig(headless);
-                    capabilities.setCapability(FirefoxOptions.FIREFOX_OPTIONS, firefoxOptions);
+                    options = getFirefoxOptionsFromConfig(headless);
                     break;
                 case "edge":
-                    // Correct syntax for Selenium 4.x+
-                    EdgeOptions edgeOptions = getEdgeOptionsFromConfig();
-                    capabilities.setCapability(EdgeOptions.CAPABILITY, edgeOptions);
+                    options = getEdgeOptionsFromConfig();
                     break;
                 default:
                     throw new IllegalArgumentException("Unsupported remote browser: " + browserType);
             }
             
-            // Now, create the RemoteWebDriver with the updated capabilities
-            return new RemoteWebDriver(new URL(hubUrl), capabilities);
+            logger.info("Creating remote WebDriver for {} at {}", browserType, hubUrl);
+            RemoteWebDriver remoteDriver = new RemoteWebDriver(new URL(hubUrl), options);
+            
+            // Set additional RemoteWebDriver specific configurations
+            remoteDriver.setFileDetector(new LocalFileDetector());
+            
+            return remoteDriver;
             
         } catch (Exception e) {
-            throw new RuntimeException("Failed to create remote driver", e);
+            logger.error("Failed to create remote driver for {}: {}", browserType, e.getMessage(), e);
+            throw new RuntimeException("Remote WebDriver creation failed", e);
         }
     }
+
     
     /**
      * Create Docker WebDriver instance
@@ -252,76 +260,137 @@ public class WebDriverManager {
         ChromeOptions options = new ChromeOptions();
         FrameworkConfig.Web webConfig = frameworkConfig.getWeb();
 
-        // Apply headless mode from config
+        // Apply headless mode
         if (headless) {
             options.addArguments("--headless=new");
         }
 
-        // Apply capabilities from application.yml
-        Map<String, Object> capabilities = webConfig.getCapabilities();
-        if (capabilities != null) {
-            // Handle acceptInsecureCerts
-            if (capabilities.containsKey("acceptInsecureCerts")) {
-                options.setAcceptInsecureCerts((Boolean) capabilities.get("acceptInsecureCerts"));
-            }
-
-            // New: Handle all browser-specific arguments
-            if (capabilities.containsKey("chrome")) {
-                Map<String, Object> chromeConfig = (Map<String, Object>) capabilities.get("chrome");
-                if (chromeConfig != null && chromeConfig.containsKey("args")) {
-                    // This directly reads the list of args from the YAML
-                    List<String> args = (List<String>) chromeConfig.get("args");
+        // Get Chrome-specific capabilities from YAML
+        Map<String, Object> chromeConfig = webConfig.getBrowserCapabilities("chrome");
+        if (chromeConfig != null) {
+            // Handle Chrome arguments
+            if (chromeConfig.containsKey("args")) {
+                @SuppressWarnings("unchecked")
+                List<String> args = (List<String>) chromeConfig.get("args");
+                if (args != null && !args.isEmpty()) {
                     options.addArguments(args);
+                    logger.debug("Added Chrome arguments: {}", args);
                 }
+            }
+            
+            // Handle Chrome preferences
+            if (chromeConfig.containsKey("prefs")) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> prefs = (Map<String, Object>) chromeConfig.get("prefs");
+                if (prefs != null && !prefs.isEmpty()) {
+                    options.setExperimentalOption("prefs", prefs);
+                    logger.debug("Added Chrome preferences: {}", prefs);
+                }
+            }
+            
+            // Handle experimental options
+            if (chromeConfig.containsKey("experimentalOptions")) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> expOptions = (Map<String, Object>) chromeConfig.get("experimentalOptions");
+                expOptions.forEach(options::setExperimentalOption);
             }
         }
 
-        // Window size logic can be moved to configureDriverFromConfig
+        // Apply global capabilities
+        Map<String, Object> capabilities = webConfig.getCapabilities();
+        if (capabilities != null) {
+            if (capabilities.containsKey("acceptInsecureCerts")) {
+                options.setAcceptInsecureCerts((Boolean) capabilities.get("acceptInsecureCerts"));
+            }
+            
+            if (capabilities.containsKey("pageLoadStrategy")) {
+                options.setPageLoadStrategy(PageLoadStrategy.fromString((String) capabilities.get("pageLoadStrategy")));
+            }
+            
+            if (capabilities.containsKey("unhandledPromptBehavior")) {
+                options.setUnhandledPromptBehaviour(UnexpectedAlertBehaviour.fromString((String) capabilities.get("unhandledPromptBehavior")));
+            }
+        }
 
-        // Download preferences (can also be moved to YAML if needed)
-        Map<String, Object> prefs = new HashMap<>();
-        prefs.put("download.default_directory", System.getProperty("user.dir") + "/downloads");
-        prefs.put("download.prompt_for_download", false);
-        prefs.put("download.directory_upgrade", true);
-        prefs.put("safeBrowse.enabled", true);
-        options.setExperimentalOption("prefs", prefs);
+        // Default download preferences if not specified in config
+        if (chromeConfig == null || !chromeConfig.containsKey("prefs")) {
+            Map<String, Object> defaultPrefs = new HashMap<>();
+            defaultPrefs.put("download.default_directory", System.getProperty("user.dir") + "/downloads");
+            defaultPrefs.put("download.prompt_for_download", false);
+            defaultPrefs.put("download.directory_upgrade", true);
+            defaultPrefs.put("safeBrowse.enabled", true);
+            options.setExperimentalOption("prefs", defaultPrefs);
+        }
 
-        // Replace the problematic line with this:
-     // Just use asMap() to show all options
-        Map<String, Object> optionsMap = options.asMap();
-        logger.debug("Chrome options configured: {}", optionsMap);
+        logger.debug("Chrome options configured successfully");
         return options;
     }
+
     /**
      * Get Firefox options from Spring Boot configuration
      */
     private FirefoxOptions getFirefoxOptionsFromConfig(boolean headless) {
         FirefoxOptions options = new FirefoxOptions();
         FrameworkConfig.Web webConfig = frameworkConfig.getWeb();
-        
+
         // Apply headless mode
         if (headless) {
             options.addArguments("--headless");
         }
-        
-        // Apply capabilities from application.yml
-        Map<String, Object> capabilities = webConfig.getCapabilities();
-        if (capabilities != null) {
-            // Handle Firefox-specific options
-            if (capabilities.containsKey("moz:firefoxOptions")) {
-                Map<String, Object> firefoxConfig = (Map<String, Object>) capabilities.get("moz:firefoxOptions");
-                if (firefoxConfig.containsKey("args")) {
-                    List<String> args = (List<String>) firefoxConfig.get("args");
+
+        // Get Firefox-specific capabilities from YAML
+        Map<String, Object> firefoxConfig = webConfig.getBrowserCapabilities("firefox");
+        if (firefoxConfig != null) {
+            // Handle Firefox arguments
+            if (firefoxConfig.containsKey("args")) {
+                @SuppressWarnings("unchecked")
+                List<String> args = (List<String>) firefoxConfig.get("args");
+                if (args != null && !args.isEmpty()) {
                     options.addArguments(args);
+                    logger.debug("Added Firefox arguments: {}", args);
+                }
+            }
+            
+            // Handle Firefox preferences
+            if (firefoxConfig.containsKey("prefs")) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> prefs = (Map<String, Object>) firefoxConfig.get("prefs");
+                if (prefs != null) {
+                    prefs.forEach((key, value) -> {
+                        if (value instanceof Boolean) {
+                            options.addPreference(key, (Boolean) value);
+                        } else if (value instanceof Integer) {
+                            options.addPreference(key, (Integer) value);
+                        } else {
+                            options.addPreference(key, value.toString());
+                        }
+                    });
+                    logger.debug("Added Firefox preferences: {}", prefs);
                 }
             }
         }
-        
-        // Performance settings
-        options.addPreference("dom.webnotifications.enabled", false);
-        options.addPreference("media.volume_scale", "0.0");
-        
-        logger.debug("Firefox options configured");
+
+        // Apply global capabilities
+        Map<String, Object> capabilities = webConfig.getCapabilities();
+        if (capabilities != null) {
+            if (capabilities.containsKey("acceptInsecureCerts")) {
+                options.setAcceptInsecureCerts((Boolean) capabilities.get("acceptInsecureCerts"));
+            }
+            
+            if (capabilities.containsKey("pageLoadStrategy")) {
+                options.setPageLoadStrategy(PageLoadStrategy.fromString((String) capabilities.get("pageLoadStrategy")));
+            }
+        }
+
+        // Default preferences if not specified in config
+        if (firefoxConfig == null || !firefoxConfig.containsKey("prefs")) {
+            options.addPreference("dom.webnotifications.enabled", false);
+            options.addPreference("media.volume_scale", "0.0");
+            options.addPreference("browser.download.folderList", 2);
+            options.addPreference("browser.download.dir", System.getProperty("user.dir") + "/downloads");
+        }
+
+        logger.debug("Firefox options configured successfully");
         return options;
     }
     
@@ -331,53 +400,101 @@ public class WebDriverManager {
     private EdgeOptions getEdgeOptionsFromConfig() {
         EdgeOptions options = new EdgeOptions();
         FrameworkConfig.Web webConfig = frameworkConfig.getWeb();
-        
-        // Apply window size from config
-        if (webConfig.getWindowSize() != null) {
-            options.addArguments("--window-size=" + webConfig.getWindowSize());
-        }
-        
-        // Apply capabilities from application.yml
-        Map<String, Object> capabilities = webConfig.getCapabilities();
-        if (capabilities != null) {
-            // Handle Edge-specific options
-            if (capabilities.containsKey("ms:edgeOptions")) {
-                Map<String, Object> edgeConfig = (Map<String, Object>) capabilities.get("ms:edgeOptions");
-                if (edgeConfig.containsKey("args")) {
-                    List<String> args = (List<String>) edgeConfig.get("args");
+
+        // Get Edge-specific capabilities from YAML
+        Map<String, Object> edgeConfig = webConfig.getBrowserCapabilities("edge");
+        if (edgeConfig != null) {
+            // Handle Edge arguments
+            if (edgeConfig.containsKey("args")) {
+                @SuppressWarnings("unchecked")
+                List<String> args = (List<String>) edgeConfig.get("args");
+                if (args != null && !args.isEmpty()) {
                     options.addArguments(args);
+                    logger.debug("Added Edge arguments: {}", args);
                 }
             }
+            
+            // Handle experimental options
+            if (edgeConfig.containsKey("experimentalOptions")) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> expOptions = (Map<String, Object>) edgeConfig.get("experimentalOptions");
+                expOptions.forEach(options::setExperimentalOption);
+            }
         }
-        
-        // Default settings
-        options.addArguments("--no-sandbox");
-        options.addArguments("--disable-dev-shm-usage");
-        
-        logger.debug("Edge options configured");
+
+        // Apply global capabilities
+        Map<String, Object> capabilities = webConfig.getCapabilities();
+        if (capabilities != null) {
+            if (capabilities.containsKey("acceptInsecureCerts")) {
+                options.setAcceptInsecureCerts((Boolean) capabilities.get("acceptInsecureCerts"));
+            }
+            
+            if (capabilities.containsKey("pageLoadStrategy")) {
+                options.setPageLoadStrategy(PageLoadStrategy.fromString((String) capabilities.get("pageLoadStrategy")));
+            }
+        }
+
+        // Default arguments if not specified in config
+        if (edgeConfig == null || !edgeConfig.containsKey("args")) {
+            options.addArguments("--no-sandbox");
+            options.addArguments("--disable-dev-shm-usage");
+            options.addArguments("--disable-gpu");
+        }
+
+        logger.debug("Edge options configured successfully");
         return options;
     }
     
     /**
-     * Configure driver with settings from application.yml
+     * Enhanced driver configuration with better error handling
      */
     private void configureDriverFromConfig(WebDriver driver) {
-        FrameworkConfig.Web webConfig = frameworkConfig.getWeb();
-        
-        // Configure timeouts from application.yml
-        int timeout = webConfig.getTimeout();
-        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(timeout));
-        driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(timeout * 2));
-        driver.manage().timeouts().scriptTimeout(Duration.ofSeconds(timeout));
-        
-        // Window management
-        driver.manage().window().maximize();
-        
-        // Delete all cookies
-        driver.manage().deleteAllCookies();
-        
-        logger.info("Driver configured with timeout: {}s, window-size: {}", 
-                   timeout, webConfig.getWindowSize());
+        try {
+            FrameworkConfig.Web webConfig = frameworkConfig.getWeb();
+            
+            // Configure timeouts
+            int timeout = webConfig.getTimeout();
+            WebDriver.Timeouts timeouts = driver.manage().timeouts();
+            timeouts.implicitlyWait(Duration.ofSeconds(timeout));
+            timeouts.pageLoadTimeout(Duration.ofSeconds(timeout * 2));
+            timeouts.scriptTimeout(Duration.ofSeconds(timeout));
+            
+            // Window management
+            String windowSize = webConfig.getWindowSize();
+            if (windowSize != null && windowSize.contains(",")) {
+                String[] dimensions = windowSize.split(",");
+                if (dimensions.length == 2) {
+                    try {
+                        int width = Integer.parseInt(dimensions[0].trim());
+                        int height = Integer.parseInt(dimensions[1].trim());
+                        driver.manage().window().setSize(new Dimension(width, height));
+                        logger.info("Window size set to: {}x{}", width, height);
+                    } catch (NumberFormatException e) {
+                        logger.warn("Invalid window size format: {}. Maximizing window instead.", windowSize);
+                        driver.manage().window().maximize();
+                    }
+                }
+            } else {
+                driver.manage().window().maximize();
+            }
+            
+            // Clear cookies and storage
+            driver.manage().deleteAllCookies();
+            
+            // Clear local storage and session storage (if supported)
+            try {
+                ((JavascriptExecutor) driver).executeScript("window.localStorage.clear();");
+                ((JavascriptExecutor) driver).executeScript("window.sessionStorage.clear();");
+            } catch (Exception e) {
+                logger.debug("Could not clear browser storage: {}", e.getMessage());
+            }
+            
+            logger.info("Driver configured successfully with timeout: {}s", timeout);
+            
+        } catch (Exception e) {
+            logger.error("Failed to configure driver: {}", e.getMessage(), e);
+            throw new RuntimeException("Driver configuration failed", e);
+        }
     }
     
     /**

@@ -1,108 +1,189 @@
-# Application Configuration for Enterprise Automation Framework
-# This file contains all the settings for your framework
-
-# Spring Boot Configuration
+# Enterprise Automation Framework Configuration
 spring:
   application:
     name: enterprise-automation-framework
-  
-  # Profile Configuration (we'll use this for different environments)
   profiles:
-    active: local  # Options: local, ci, dev, staging, prod
+    active: local
 
-# Framework Configuration
+# Main Framework Configuration
 automation:
   # Web Testing Configuration
   web:
-    browser: chrome           # Options: chrome, firefox, edge, safari
-    headless: false          # true for CI/CD, false for local development
-    timeout: 30              # Default wait timeout in seconds
-    window-size: "1920,1080"  # Browser window size (e.g., "1920,1080" for 1920x1080)
-    # New: Add browser capabilities for advanced settings
+    browser: chrome
+    headless: false
+    timeout: 30
+    window-size: "1920,1080"
+    
+    # Enhanced capabilities configuration
     capabilities:
       acceptInsecureCerts: true
-      # Example for Chrome
+      pageLoadStrategy: "eager" # normal, eager, none
+      unhandledPromptBehavior: "dismiss" # dismiss, accept, ignore
+      
+      # Chrome-specific configuration
       chrome:
-        # New: Centralized all Chrome arguments here
         args:
           - "--disable-gpu"
           - "--no-sandbox"
           - "--disable-dev-shm-usage"
           - "--disable-extensions"
           - "--start-maximized"
-      # Firefox Options
-      moz:firefoxOptions:
-        args: ["-headless"] # Note: Firefox uses a single hyphen for headless mode.
-      # Microsoft Edge Options (similar to Chrome)
-      ms:edgeOptions:
+          - "--disable-web-security"
+          - "--disable-features=VizDisplayCompositor"
+        prefs:
+          "profile.default_content_setting_values.notifications": 2
+          "profile.default_content_settings.popups": 0
+          "download.default_directory": "${user.dir}/downloads"
+          
+      # Firefox-specific configuration  
+      firefox:
+        args:
+          - "--headless"
+        prefs:
+          "dom.webnotifications.enabled": false
+          "media.volume_scale": "0.0"
+          "browser.download.folderList": 2
+          
+      # Edge-specific configuration
+      edge:
         args:
           - "--disable-gpu"
           - "--no-sandbox"
           - "--disable-dev-shm-usage"
           - "--start-maximized"
 
-  # API Testing Configuration  
+  # API Testing Configuration
   api:
     base-url: "https://jsonplaceholder.typicode.com"
     timeout: 15
     retry-count: 3
-    # New: Add default headers for all API requests
     headers:
       Content-Type: "application/json"
       Accept: "application/json"
-    
+      User-Agent: "Enterprise-Automation-Framework/3.0"
+
   # Database Configuration
   database:
     url: "jdbc:mysql://localhost:3306/testdb"
-    username: "${DB_USERNAME}"
-    password: "${DB_PASSWORD}"
+    username: "${DB_USERNAME:testuser}"
+    password: "${DB_PASSWORD:testpass}"
     driver: "com.mysql.cj.jdbc.Driver"
-    
+    connection-timeout: 30000
+    max-pool-size: 10
+
   # Mobile Testing Configuration
   mobile:
-    platform: android        # Options: android, ios
+    platform: android
     device-name: "Pixel_6"
     app-path: "/path/to/app.apk"
-    
+    automation-name: "UiAutomator2"
+    new-command-timeout: 300
+
   # Reporting Configuration
   reporting:
     allure-results: "target/allure-results"
     screenshots: true
     video-recording: false
+    screenshot-on-failure: true
+    report-portal:
+      enabled: false
+      endpoint: "http://localhost:8080"
+
+  # Remote execution configuration
+  remote:
+    hub-url: "http://localhost:4444"
+    docker:
+      enabled: false
+      selenium-image: "selenium/standalone-chrome:latest"
+    cloud:
+      provider: "browserstack" # browserstack, saucelabs, lambdatest
+      credentials:
+        username: "${CLOUD_USERNAME:}"
+        access-key: "${CLOUD_ACCESS_KEY:}"
 
 # Logging Configuration
 logging:
   level:
     com.enterprise.automation: INFO
-    # New: Set specific logging for REST Assured or other clients
     io.restassured: DEBUG
     org.springframework: WARN
     org.selenium: WARN
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: "logs/automation.log"
 
 ---
-# Local Environment Profile
+# Local Development Profile
 spring:
   config:
     activate:
       on-profile: local
+      
 automation:
   web:
     headless: false
+    timeout: 60
   database:
     url: "jdbc:mysql://localhost:3306/testdb_local"
+  reporting:
+    screenshots: true
+    video-recording: false
 
 ---
-# CI/CD Environment Profile  
+# CI/CD Profile
 spring:
   config:
     activate:
       on-profile: ci
+      
 automation:
   web:
     headless: true
     browser: chrome
+    capabilities:
+      chrome:
+        args:
+          - "--headless=new"
+          - "--disable-gpu"
+          - "--no-sandbox"
+          - "--disable-dev-shm-usage"
+          - "--window-size=1920,1080"
   reporting:
     screenshots: true
     video-recording: true
+    screenshot-on-failure: true
+
+---
+# Docker Profile
+spring:
+  config:
+    activate:
+      on-profile: docker
+      
+automation:
+  web:
+    headless: true
+  remote:
+    hub-url: "http://selenium-hub:4444"
+  database:
+    url: "jdbc:mysql://mysql:3306/testdb"
+
+---
+# Production Profile
+spring:
+  config:
+    activate:
+      on-profile: prod
+      
+automation:
+  web:
+    headless: true
+    timeout: 45
+  reporting:
+    screenshots: false
+    video-recording: false
+  database:
+    connection-timeout: 60000
+    max-pool-size: 5
